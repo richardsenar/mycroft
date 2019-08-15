@@ -1,0 +1,237 @@
+
+
+
+==============================================
+
+Data Standardization:
+- Before going through the matching process, all fields go through a cleansing process to standardize the string values.  This involves the following steps:
+1. Trim leading and trailing spaces
+		ex. ["  ABC-DE/FG&H  "] -> ["ABC-DE/FG&H"]
+2. Replace special characters with spaces ["'", "#", "$", "-", "+", ".", "*", "(", ")", ":", ";", "{", "}", "|", "&", " ", "_", "/", `\`]
+		ex. ["ABC-DE/FG&H"] -> ["ABC DE FG H"]
+3. Convert characters to lower case
+		ex. ["ABC DE FG H"] -> ["abc de fg h"]
+** Only when data standardization is complete will the matching process begin
+
+Current Rule Assignments:
+- Rule 1: Exact string match on standardized fields
+		ex. "001 224 55 000"  ==  "001 224 55 000"
+- Rule 2: Low Level Rule Match on standardized fields, minimal manipulation by adding zero to the front, does not impact string context/meaning.
+		ex. "00122455000"  ==  "00000122455000"
+- Rule 5: High Level Rule Match on standardized fields, manipulation impacts meaning & context by appending zeros to the front and end, STRICTLY requires secondary field validation.
+		ex. "00122455000"  ==  "00000122455000000" (as long as secondary match condition is met)
+- Rule 6: Truncation Level Rule Match on standardized fields, some form of truncation was done to source value in order to get a match, STRICTLY requires secondary field validation.
+		ex. "BB0061031200001" ==  "0061031200001" (as long as secondary match condition is met)
+- Rule 7: Higher Level Match, ReGex pattern matching ignores arbitrary zeros or spaces in the front, middle or end of the string, STRICTLY requires secondary field validation.
+		ex. "0061031200001" ==  "00000610312000000010000" (as long as secondary match condition is met)
+- Rule 9000 – Address Match, All address fields match ["StrNumber", "StrName", "City", "State", "UnitNumber"]
+
+Additional Rule Validation:
+-  To ensure highest possible accuracy, additional validation will be added for rules 5 or higher.  Match candidates will be evaluated in this order, 1 being the highest priority
+1. Primary == Primary, Rule >= 5, Secondary match conditions ["StrNumber", "StrName", "UnitNumber"]
+2. Primary == Primary, Rule >= 5, Secondary match conditions ["StrNumber", "StrName"]
+3. Primary == Primary, Rule >= 5, Secondary match conditions ["StrNumber"]
+3. Primary == Primary, Rule >= 5
+4. Primary == Alternate, Rule >= 5, Secondary match conditions ["StrNumber", "StrName", "UnitNumber"]
+5. Primary == Alternate, Rule >= 5, Secondary match conditions ["StrNumber", "StrName"]
+6. Primary == Alternate, Rule >= 5, Secondary match conditions ["StrNumber"]
+6. Primary == Alternate, Rule >= 5, Seconda
+5. Alternate == Alternate, Rule >= 5, Secondary match conditions ["StrNumber", "StrName", "UnitNumber"]
+6. Alternate == Alternate, Rule >= 5, Secondary match conditions ["StrNumber", "StrName"]
+** NOTE: Match condition is contingent on ["StrNumber", "StrName", "UnitNumber"] being populated.  If one of the three elements is blank, then match fails.
+
+
+Order or Priority:
+1. Primary == Primary, SMC ["StrNumber", "StrName", "UnitNumber"]
+2. Primary == Primary, SMC ["StrNumber", "StrName"]
+3. Primary == Primary, SMC ["StrNumber"]
+4. Primary == Primary
+5. Primary == Alternate, SMC ["StrNumber", "StrName", "UnitNumber"]
+6. Primary == Alternate, SMC ["StrNumber", "StrName"]
+7. Primary == Alternate, SMC ["StrNumber"]
+8. Primary == Alternate
+9. Address == address
+10. Alternate == Alternate, SMC ["StrNumber", "StrName", "UnitNumber"]
+11. Alternate == Alternate, SMC ["StrNumber", "StrName"]
+12. Alternate == Alternate, SMC ["StrNumber"]
+13. Alternate == Alternate
+
+==============================================
+
+SAMPLE 1
+	RAW values
+    "BK_APN"             : "172600 145.11-1-1",
+    "CL_PN_Prime"        : "17260014501100010010000000",
+
+	Processed values 
+0    "BK_APN"             : "172600 145 11 1 1",
+    "CL_PN_Prime"        : "17260014501100010010000000",
+
+	Regex Match String
+	"BK_APN"             : "[0]*172600[0]*145[0]*11[0]*1[0]*1[0]*",
+    "CL_PN_Prime"        : "17260014501100010010000000",
+
+	Regex Match String Alternative
+	"BK_APN"             : "[0]{0,8}172600[0]{0,4}145[0]{0,4}11[0]{0,4}1[0]{0,4}1[0]{0,8}",
+    "CL_PN_Prime"        : "17260014501100010010000000",
+
+SAMPLE 2
+	RAW values
+    "BK_APN"             : "212801 119.44-7-38",
+    "CL_PN_Prime"        : "21280111904400070380000000",
+
+	Processed values
+    "BK_APN"             : "212801 119 44 7 38",
+    "CL_PN_Prime"        : "21280111904400070380000000",
+
+	Regex Match String 
+    "BK_APN"             : "[0]*212801[0]*119[0]*44[0]*7[0]*38[0]*",
+    "CL_PN_Prime"        : "21280111904400070380000000",
+
+	Regex Match String Alternative
+    "BK_APN"             : "[0]{0,8}212801[0]{0,4}119[0]{0,4}44[0]{0,4}7[0]{0,4}38[0]{0,8}",
+    "CL_PN_Prime"        : "21280111904400070380000000",
+
+SAMPLE 3
+	RAW values
+    "BK_APN"             : "212801 119.44-2-7",
+    "CL_PN_Prime"        : "21280111904400020070000000",
+
+	Processed values
+    "BK_APN"             : "212801 119 44 2 7",
+    "CL_PN_Prime"        : "21280111904400020070000000",
+
+	Regex Match String 
+    "BK_APN"             : "[0]*212801[0]*119[0]*44[0]*2[0]*7[0]*",
+    "CL_PN_Prime"        : "21280111904400020070000000",
+
+	Regex Match String Alternative
+    "BK_APN"             : "[0]{0,8}212801[0]{0,4}119[0]{0,4}44[0]{0,4}2[0]{0,4}7[0]{0,8}",
+    "CL_PN_Prime"        : "21280111904400020070000000",
+
+/*********************************************/
+    STEP 1
+/*********************************************/
+SELECT	PropertyParcelID
+		, APNFormatted
+		, sa_property_id
+		, SitusStateCountyFIPS
+		, SitusHouseNumber
+		, SitusStreetName
+		, SitusCity
+		, SitusState
+		, SitusUnitValue
+FROM	DLPnextGen.dbo.NextGen_PropertyFeaturesOutput
+WHERE	PropertyGeoDataKey < 0  
+AND		AssessorSource = 246
+AND		sa_property_id <> -1 
+AND		MeaningfulUpdate > '2016-12-31'
+AND		PropertyDeleteKey < 0
+
+Load into [DBWork].[dbo].[Sherlock_MissingParcelBoundariesNextGen_PropertyFeaturesOutput]
+TOTAL Load Count: 285,631
+
+/*********************************************/
+    STEP 2
+/*********************************************/
+type bkData {
+	DPID           
+	Apn            
+	OLDAPN         
+	TxACCTNBR      
+	PropHOUSENBR   
+	PropSTREETNAME 
+	PropCITY       
+	PropSTATE      
+	PropUNITNBR    
+}
+type clData {
+	SAPID                   <--- NextGenPFO, sa_property_id
+	SaPARCELNBRPRIMARY      <--- NextGenPFO, APNFormatted
+	SaPARCELNBRPREVIOUS  
+	SaPARCELNBRALT       
+	SaPARCELACCOUNTNBR   
+	SaPARCELNBRREFERENCE 
+	SaSITEHOUSENBR          <--- NextGenPFO, SitusHouseNumber
+	SaSITESTREETNAME        <--- NextGenPFO, SitusStreetName
+	SaSITEUNITVAL           <--- NextGenPFO, SitusUnitValue
+	SaSITECITYSTATE         <--- NextGenPFO, SitusCity + NextGenPOF, SitusState
+}
+
+/*********************************************/
+SELECT * FROM dbwork.dbo.Sherlock_MatchRules
+INSERT INTO dbwork.dbo.Sherlock_MatchRules
+VALUES
+(0, 'Trim'),
+(1, 'Trim | 0%s'),
+(2, 'Trim | 00%s'),
+(3, 'Trim | 000%s'),
+(4, 'Trim | 0000%s'),
+(5, 'Trim | 00000%s'),
+(6, 'Trim | 000000%s'),
+(500, 'Trim | RemSep # % $ - + . * ( ) : ; { } | &   _'),
+(1, 'Trim | 0%s'),
+(2, 'Trim | 00%s'),
+(3, 'Trim | 000%s'),
+(4, 'Trim | 0000%s'),
+(5, 'Trim | 00000%s'),
+(6, 'Trim | 000000%s'),
+(501, 'Trim-RemSep | %s0'),
+(502, 'Trim-RemSep | %s00'),
+(503, 'Trim-RemSep | %s000'),
+(504, 'Trim-RemSep | %s0000'),
+(505, 'Trim-RemSep | %s00000'),
+(506, 'Trim-RemSep | %s000000'),
+(507, 'Trim-RemSep | 0%s0'),
+(508, 'Trim-RemSep | 00%s00'),
+(509, 'Trim-RemSep | 00%s000'),
+(510, 'Trim-RemSep | 000%s00'),
+(511, 'Trim-RemSep | 000%s000'),
+(512, 'Trim | Split - | Parse = ABC | 0A0B00C000'),
+(513, 'Trim | Parse = ABC | 0A0B0C000'),
+(514, 'Trim | Split - | Parse = AB | 00AB000'),
+(515, 'Trim | Split - | Parse = AB | 00A0B000'),
+(516, 'Trim | Split - | Parse = AB | 0A0B000'),
+(517, 'Trim | Split - | Parse APN = AB | TxAcNm = C | ABC'),
+(518, 'Trim | FIPS 56005 only | TxAcNm[1:] = A | 00A'),
+(519, 'Trim | FIPS 37077 only | apn[:12]'),
+(520, 'Trim | FIPS 13153 only | apn[:len(apn)-2]'),
+(401, 'Address Match [HseNum, StrtName, City, State, UnitNum]'),
+
+// func HasPrefix(s, prefix string) bool {}
+// func TrimPrefix(s, prefix string) string{}
+
+551000 1-279-0028
+5510000000010279000028
+-----
+"551000", "1", "279", "0028"
+-----
+551000     1 279  0028
+5510000000010279000028
+
+BKAPN = "551000 1-315-0558.A"
+CLPNPrime = "5510000000010315000558A"
+
+Step 1
+551000 1-315-0558.A
+-----
+Step 2
+"551000", "1", "315", "0558", "A"
+-----
+Step 3
+BK - 551000     1 315  0558A
+CL - 5510000000010315000558A
+------
+Step 4
+Mask "%s00000%s0%s00%s%s"
+
+553203 8-17-486
+553203008017486       0000
+-----
+553203 8 17486
+5532030080174860000
+-----
+553203  8 17486
+5532030080174860000
+-----
+Mask "%s00%s0%s%s0000"
